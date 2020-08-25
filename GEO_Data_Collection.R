@@ -470,7 +470,7 @@ parseSOFTfile <- function(file) {
   if (length(grep('^!Series_overall_design', info))==0) {
     overall.design <- NA
   } else {
-    overall.design <- strsplit(info[grep('^!Series_overall_design', info)], split = ' = ')[[1]][2]
+    overall.design <- paste(colsplit(string=info[grep('^!Series_overall_design', info)], pattern=" = ", names=c('x','value'))$value, collapse = '; ')
   }
   # platform <- strsplit(info[grep('^!Series_platform_id', info)], split = ' = ')[[1]][2]
   date <- strsplit(info[grep('^!Series_status = Public', info)], split = ' Public on ')[[1]][2]
@@ -498,10 +498,11 @@ parseSOFTfile <- function(file) {
 }
 
 
+series.table <- readRDS(file=paste0('data/GEO/GEO_Series_Table_2020-08-20.RDS'))
 
 series.info <- list()
 
-for (accession in series.table$Accession[69237:nrow(series.table)]) {
+for (accession in series.table$Accession) {
   print (accession)
   
   fl <- file.path('data/GEO/Series_SOFT/', paste0(accession, '.txt'))
@@ -521,7 +522,7 @@ View(series.info)
 # downloadAccessionInfo(accession = 'GSE74038', dest.dir = 'data/GEO/Series_SOFT/')
 # which(series.table$Accession=='GSE74038')
 
-saveRDS(series.info, file=paste0('data/GEO_Series_Info_', Sys.Date(), '.RDS'))
+saveRDS(series.info, file=paste0('data/GEO_Series_Info_2020-08-20.RDS'))
 
 
 ####################
@@ -585,21 +586,125 @@ series.info$Technology <- arrays
 saveRDS(series.info, file=paste0('data/GEO_Series_Info_', Sys.Date(), '.RDS'))
 
 
-
-organisms <- c('Homo sapiens', 'Mus musculus', 'Rattus norvegicus')
-series.type <- c('Expression profiling by array', 'Expression profiling by high throughput sequencing')
-
 series.summary <- data.frame(series.table, series.info, stringsAsFactors = F)
 View(series.summary)
-saveRDS(series.summary, file=paste0('data/GEO_Series_Summary_', Sys.Date(), '.RDS'))
+saveRDS(series.summary, file=paste0('data/GEO/GEO_Series_Summary_', Sys.Date(), '.RDS'))
+
+#######
+
+View(series.summary)
+dim(series.summary)
+series.summary$Summary[which(series.summary$Accession=='GSE32583')]
+
+grepl('sle', txt[which(series.summary$Accession=='GSE32583')], ignore.case = T)
+txt[which(series.summary$Accession=='GSE32583')]
 
 
-#####
-idx.organisms <- grep(paste(organisms, collapse = '|'), series.summary$Taxonomy)
-idx.series.type <- grep(paste(series.type, collapse = '|'), series.summary$Series.Type)
-idx.series.type
 
-idx <- Reduce(intersect, list(idx.organisms, idx.series.type))
+
+
+series.summary <- readRDS(file=paste0('data/GEO/GEO_Series_Summary_2020-08-22.RDS'))
+
+series.type <- c('Expression profiling by array', 'Expression profiling by high throughput sequencing')
+idx.series.type <- grep(paste(series.type, collapse = '|'), series.summary$Series.Type, ignore.case = T)
+series.summary <- series.summary[idx.series.type,]
+
+technologies <- c('Affymetrix','Illumina','Agilent')
+idx.technologies <- grep(paste(technologies, collapse = '|'), series.summary$Technology, ignore.case = T)
+series.summary <- series.summary[idx.technologies,]
+
+organisms <- c('Homo sapiens', 'Mus musculus', 'Rattus norvegicus')
+idx.organisms <- grep(paste(organisms, collapse = '|'), series.summary$Taxonomy, ignore.case = T)
+series.summary <- series.summary[idx.organisms,]
+
+oncology <- c('tumor', 'cancer', 'carcinoma', 'oncology')
+inflammation <- c('inflammation', 'inflammatory disease', 'ibd', 'inflammatory bowel disease', 'ulcerative colitis', 'crohn',
+                  'sle', 'system lupus erythematosus', 'rheumatoid arthritis')
+fibrosis <- c('fibrosis','chronic kidney disease','diabetic nephropathy','diabetic kidney disease','focal segmental glomerulosclerosis',
+              'lupus nephritis')
+hbv <- c('hbv','hepatitis b','chb')
+nash <- c('nash')
+
+txt <- paste(series.summary$Title, series.summary$Summary, series.summary$Overall.Design)
+
+idx.oncology <- grep(paste(oncology, collapse = '|'), txt, ignore.case = TRUE)
+idx.oncology
+
+idx.inflammation <- grep(paste(inflammation, collapse = '|'), txt, ignore.case = TRUE)
+idx.inflammation
+
+idx.hbv <- grep(paste(hbv, collapse = '|'), txt, ignore.case = TRUE)
+idx.nash <- grep(paste(nash, collapse = '|'), txt, ignore.case = TRUE)
+idx.fibrosis <- grep(paste(fibrosis, collapse = '|'), txt, ignore.case = TRUE)
+idx.fibrosis
+
+series.summary$Tags <- NA
+
+series.summary$Tags[idx.oncology] <- 'Oncology'
+series.summary$Tags[idx.inflammation] <- 'Inflammation'
+series.summary$Tags[idx.hbv] <- 'HBV'
+series.summary$Tags[idx.nash] <- 'NASH'
+series.summary$Tags[idx.fibrosis] <- 'Fibrosis'
+
+table(series.summary$Tags)
+sum(!is.na(series.summary$Tags))
+
+idx <- which(!is.na(series.summary$Tags))
+idx
+
+series.summary <- series.summary[idx,]
+
+length(txt)
+dim(series.summary)
+
+
+
+txt <- paste(series.summary$Title, series.summary$Summary, series.summary$Overall.Design)
+filter <- grep('miRNA|microRNA|noncoding|non-coding|circrna', txt, ignore.case = T)
+filter
+
+View(series.summary[-filter,])
+
+series.summary <- series.summary[-filter,]
+
+filter <- grep('single cell|single-cell|scrnaseq', txt, ignore.case = T)
+filter
+
+
+
+
+######
+series.summary$Tags <- NA
+
+oncology <- c('tumor', 'cancer', 'carcinoma', 'oncology')
+inflammation <- c('inflammation', 'inflammatory disease', 'ibd', 'inflammatory bowel disease', 'ulcerative colitis', 'crohn',
+                  'sle', 'system lupus erythematosus', 'rheumatoid arthritis')
+fibrosis <- c('fibrosis','chronic kidney disease','diabetic nephropathy','diabetic kidney disease','focal segmental glomerulosclerosis')
+hbv <- c('hbv','hepatitis b','chb')
+nash <- c('nash')
+
+
+txt <- paste(series.summary$Title, series.summary$summary, series.summary$Overall.Design)
+idx.oncology <- grep(paste(oncology, collapse = '|'), txt, ignore.case = TRUE)
+idx.oncology
+
+idx.inflammation <- grep(paste(inflammation, collapse = '|'), txt, ignore.case = TRUE)
+idx.inflammation
+
+idx.hbv <- grep(paste(hbv, collapse = '|'), txt, ignore.case = TRUE)
+idx.hbv
+idx.nash <- grep(paste(nash, collapse = '|'), txt, ignore.case = TRUE)
+idx.fibrosis <- grep(paste(fibrosis, collapse = '|'), txt, ignore.case = TRUE)
+idx.fibrosis
+
+series.summary$Tags[idx.oncology] <- 'Oncology'
+series.summary$Tags[idx.inflammation] <- 'Inflammation'
+series.summary$Tags[idx.hbv] <- 'HBV'
+series.summary$Tags[idx.nash] <- 'NASH'
+series.summary$Tags[idx.fibrosis] <- 'Fibrosis'
+
+idx <- which(!is.na(series.summary$Tags))
+idx
 
 series.summary <- series.summary[idx,]
 
@@ -607,10 +712,67 @@ series.summary <- series.summary[idx,]
 
 
 
+
+#####
+series.summary <- readRDS(file=paste0('data/GEO/GEO_Series_Summary_2020-08-22.RDS'))
+dim(series.summary)
+                          
+
+organisms <- c('Homo sapiens', 'Mus musculus', 'Rattus norvegicus')
+series.type <- c('Expression profiling by array', 'Expression profiling by high throughput sequencing')
+technologies <- c('Affymetrix','Illumina','Agilent')
+
+idx.organisms <- grep(paste(organisms, collapse = '|'), series.summary$Taxonomy, ignore.case = T)
+idx.series.type <- grep(paste(series.type, collapse = '|'), series.summary$Series.Type, ignore.case = T)
+idx.series.type
+
+idx.technologies <- grep(paste(technologies, collapse = '|'), series.summary$Technology, ignore.case = T)
+
+idx <- Reduce(intersect, list(idx.organisms, idx.series.type, idx.technologies))
+idx
+
+series.summary <- series.summary[idx,]
+
+
+# filter <- grep('miRNA', series.summary$Technology, ignore.case = T)
+# filter
+# 
+# series.summary <- series.summary[-filter,]
+
+
 ######
-txt <- paste(series.info$Title, series.info$summary, series.info$Overall.Design)
-idx <- grep('tumor|cancer', txt, ignore.case = TRUE)
+series.summary$Tags <- NA
 
-txt[idx]
+oncology <- c('tumor', 'cancer', 'carcinoma', 'oncology')
+inflammation <- c('inflammation', 'inflammatory disease', 'ibd', 'inflammatory bowel disease', 'ulcerative colitis', 'crohn',
+                  'sle', 'system lupus erythematosus', 'rheumatoid arthritis')
+fibrosis <- c('fibrosis','chronic kidney disease','diabetic nephropathy','diabetic kidney disease','focal segmental glomerulosclerosis')
+hbv <- c('hbv','hepatitis b','chb')
+nash <- c('nash')
 
-View(series.info)
+
+txt <- paste(series.summary$Title, series.summary$Summary, series.summary$Overall.Design)
+idx.oncology <- grep(paste(oncology, collapse = '|'), txt, ignore.case = TRUE)
+idx.oncology
+
+idx.inflammation <- grep(paste(inflammation, collapse = '|'), txt, ignore.case = TRUE)
+idx.inflammation
+
+idx.hbv <- grep(paste(hbv, collapse = '|'), txt, ignore.case = TRUE)
+idx.nash <- grep(paste(nash, collapse = '|'), txt, ignore.case = TRUE)
+idx.fibrosis <- grep(paste(fibrosis, collapse = '|'), txt, ignore.case = TRUE)
+idx.fibrosis
+
+series.summary$Tags[idx.oncology] <- 'Oncology'
+series.summary$Tags[idx.inflammation] <- 'Inflammation'
+series.summary$Tags[idx.hbv] <- 'HBV'
+series.summary$Tags[idx.nash] <- 'NASH'
+series.summary$Tags[idx.fibrosis] <- 'Fibrosis'
+
+idx <- which(!is.na(series.summary$Tags))
+idx
+
+series.summary <- series.summary[idx,]
+
+View(series.summary)
+
